@@ -157,6 +157,18 @@ def test_iniconfig_duplicate_key_fails() -> None:
     assert "duplicate name" in str(excinfo.value)
 
 
+def test_iniconfig_unclosed_section_header_fails() -> None:
+    with pytest.raises(ParseError) as excinfo:
+        IniConfig("x", data="[section\nname = 1")
+    assert "unclosed section header" in str(excinfo.value)
+
+
+def test_iniconfig_unexpected_text_after_section_header_fails() -> None:
+    with pytest.raises(ParseError) as excinfo:
+        IniConfig("x", data="[section] extra\nname = 1")
+    assert "unexpected text after section header" in str(excinfo.value)
+
+
 def test_iniconfig_lineof() -> None:
     config = IniConfig(
         "x.ini",
@@ -326,13 +338,15 @@ def test_parse_strips_inline_comments() -> None:
             name1 = value1 # this is a comment
             name2 = value2 ; this is also a comment
             name3 = value3# no space before comment
+            url = http://x/#frag # some URL
             list = a, b, c # some items
             """
         ),
     )
     assert config["section1"]["name1"] == "value1"
     assert config["section1"]["name2"] == "value2"
-    assert config["section1"]["name3"] == "value3"
+    assert config["section1"]["name3"] == "value3# no space before comment"
+    assert config["section1"]["url"] == "http://x/#frag"
     assert config["section1"]["list"] == "a, b, c"
 
 

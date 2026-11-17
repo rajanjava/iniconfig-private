@@ -118,6 +118,20 @@ def parse_lines(
     return result
 
 
+def _strip_inline_comment(val: str) -> str:
+    comment_start = len(val)
+    for prefix in COMMENTCHARS:
+        index = -1
+        while True:
+            index = val.find(prefix, index + 1)
+            if index == -1:
+                break
+            if index == 0 or val[index - 1].isspace():
+                comment_start = min(comment_start, index)
+                break
+    return val[:comment_start].rstrip()
+
+
 def _parseline(
     path: str,
     line: str,
@@ -135,15 +149,20 @@ def _parseline(
     # section
     if line[0] == "[":
         realline = line
-        for c in COMMENTCHARS:
-            line = line.split(c)[0].rstrip()
-        if line[-1] == "]":
+        line = _strip_inline_comment(line)
+        if line.endswith("]"):
             section_name = line[1:-1]
             # Optionally strip whitespace from section name (issue #4)
             if strip_section_whitespace:
                 section_name = section_name.strip()
             return section_name, None
-        return None, realline.strip()
+        if "]" in line:
+            raise ParseError(
+                path, lineno, f"unexpected text after section header: {realline!r}"
+            )
+        raise ParseError(
+            path, lineno, f"unclosed section header: {realline!r}"
+        )
     # value
     elif not line[0].isspace():
         try:
@@ -163,8 +182,7 @@ def _parseline(
         value = value.strip()
         # Strip inline comments from values if requested (issue #55)
         if strip_inline_comments:
-            for c in COMMENTCHARS:
-                value = value.split(c)[0].rstrip()
+            value = _strip_inline_comment(value)
 
         return key_name, value
     # continuation
@@ -172,8 +190,7 @@ def _parseline(
         line = line.strip()
         # Strip inline comments from continuations if requested (issue #55)
         if strip_inline_comments:
-            for c in COMMENTCHARS:
-                line = line.split(c)[0].rstrip()
+            line = _strip_inline_comment(line)
         return None, line
 
 
