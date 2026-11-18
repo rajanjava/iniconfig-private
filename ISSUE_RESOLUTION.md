@@ -38,6 +38,13 @@ Prior to the fix:
 - `[section` and `[section] extra` did not raise `ParseError`.
 - `http://x/#frag` was truncated to `'http://x/'`.
 
+## Solution Approach
+1. **Enforce Strict INI Grammar Rules:** Analyzed two parsing ambiguities in `src/iniconfig/_parse.py`:
+   - Malformed unindented lines starting with `[` (missing closing `]`) were silently appended as multiline continuations to the previous key instead of raising `ParseError`.
+   - Inline `#` / `;` comments stripped characters even without preceding whitespace, corrupting values containing URL fragments (e.g., `http://example.com/#section`).
+2. **Targeted Parser Tightening:** Rejected unindented unclosed section headers with `ParseError`, and required whitespace before inline comment delimiters so URL fragments and non-comment tokens stay intact.
+3. **TDD & Regression Safety:** Added regression tests in `testing/test_iniconfig.py` covering malformed section headers and URL values with `#` fragments, and verified the full iniconfig test suite passes.
+
 ## 4. Solution & Code Changes
 In `src/iniconfig/_parse.py`:
 - Added `_strip_inline_comment(val: str)` requiring whitespace before `#` or `;` (matching Python's `configparser`).
